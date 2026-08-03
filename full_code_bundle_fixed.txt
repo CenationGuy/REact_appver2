@@ -1,0 +1,1023 @@
+================================================================
+TALENT COCKPIT — FULL CODE BUNDLE (office migration)
+================================================================
+Every file below is FINAL. Paste each block into the matching
+file path shown in its header. Do them in this order (top to
+bottom) — App.jsx is last because it imports everything else.
+
+REMINDERS:
+  - Do NOT overwrite the real office src/data/models.json
+  - Ensure src/data/labels.json has a "cat" field per entry
+  - Filenames must match App.jsx imports EXACTLY (case-sensitive)
+  - index.css is provided as a separate file (index.css)
+
+Files in this bundle:
+  1. src/utils/describe.js
+  2. src/components/Layout.jsx
+  3. src/views/OverviewView.jsx
+  4. src/views/DriverView.jsx
+  5. src/views/HeatmapView.jsx
+  6. src/views/SimulationView.jsx
+  7. src/views/DeepDive.jsx
+  8. src/App.jsx
+
+(utils/nice.js, utils/heatmap.js, utils/simulate.js are UNCHANGED
+ from what you already have — not repeated here.)
+
+
+################################################################
+# 1. src/utils/describe.js
+################################################################
+import { nice } from './nice';
+
+// Plain-English description of what each feature means.
+const DESCRIPTIONS = {
+  'Impact Rating Outstanding_Yes': 'Whether the person received an Outstanding impact rating in their most recent review. It reflects the annual performance signal managers lean on most when nominating talent.',
+  'Impact Rating Outstanding': 'Whether the person received an Outstanding impact rating in their most recent review.',
+  'last_year_accelerated_talent': 'Whether the person was already classified as Accelerated Talent in the previous year. Prior-year status tends to carry forward.',
+  'last_year_top_talent': 'Whether the person was already classified as Top Talent in the previous year.',
+  'last_year_more_impact_needed': 'Whether the person was flagged last year as needing more impact — a signal they were not yet ready to progress.',
+  'Received Stars (Last 12M)_Yes': 'Whether the person received Star recognition awards in the last 12 months — a peer/manager recognition signal.',
+  'Received ThankYou (Last 12M)_Yes': 'Whether the person received Thank-You recognitions in the last 12 months.',
+  'TwCode_12': 'Whether the person sits at TW grade 12 — a seniority/grade marker.',
+  'Promotion_Last12M_Yes': 'Whether the person was promoted in the last 12 months. A recent promotion often means the next step is not due yet.',
+  'DiscoverGraduate_Yes': 'Whether the person came through the Discover graduate programme.',
+  'TenureInRole': 'How long the person has been in their current role.',
+  'Mgr_TenureInVodafone': 'How long the person’s manager has been at Vodafone.',
+  'TeamSize': 'The size of the team the person sits in or manages.',
+  'Lateral_Move_Count_24M_Yes': 'Whether the person made lateral moves in the last 24 months — breadth of experience.',
+  'PeopleManagerVal_Yes': 'Whether the person is a people manager.',
+  'Age_Diff': 'The age difference between the person and their manager.',
+  'Mgr_Age': 'The age of the person’s manager.',
+  'Same_Gender_True': 'Whether the person and their manager are the same gender.',
+  'Gender': 'The person’s gender. Shown for descriptive context only — never used as a lever.',
+};
+
+export function describe(feature) {
+  return DESCRIPTIONS[feature] ?? `${nice(feature)} is one of the factors in this market's model.`;
+}
+
+
+###########################################################################################################################
+# 2. src/components/Layout.jsx
+################################################################
+const NAV = [
+  { id: 'overview', label: 'Overview', icon: '◈' },
+  { id: 'driver', label: 'Driver chart', icon: '▤' },
+  { id: 'heatmap', label: 'Heatmap', icon: '▦' },
+  { id: 'simulation', label: 'Simulation', icon: '◐' },
+];
+
+const selStyle = {
+  width: '100%', fontSize: 12, padding: '9px 11px',
+  border: '1px solid var(--border-strong)', borderRadius: 9,
+  background: '#fff', color: 'var(--text-primary)', marginBottom: 4,
+  boxShadow: '0 1px 2px rgba(40,38,34,0.03)',
+};
+
+const flt = { fontSize: 9, letterSpacing: '.08em', color: 'var(--text-faint)', margin: '13px 0 5px', fontWeight: 600 };
+
+export default function Layout({
+  active, onNavigate,
+  markets, market, setMarket,
+  blocks, block, setBlock,
+  featureOptions, feature, setFeature,
+  groupOptions, group, setGroup,
+  deepDive,
+  children,
+}) {
+  return (
+    <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', height: '100vh' }}>
+
+      {/* TOP BAR — brand lockup + gold hairline */}
+      <div style={{
+        position: 'relative',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '14px 24px',
+        background: 'linear-gradient(180deg,#fdfcfa,#faf9f6)',
+        boxShadow: '0 1px 0 var(--border), 0 2px 12px rgba(40,38,34,0.04)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#E60000,#b40000)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 18,
+            boxShadow: '0 3px 10px rgba(230,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.25)',
+          }}>◆</div>
+          <div>
+            <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-.01em' }}>Talent Analytics</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '.02em' }}>What drives progression across Vodafone</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-secondary)',
+            background: '#fff', border: '1px solid var(--border-strong)', borderRadius: 9, padding: '8px 13px',
+            boxShadow: '0 1px 2px rgba(40,38,34,0.04)',
+          }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold-soft),var(--gold))' }} />
+            HR Leadership Team ▾
+          </div>
+          <div style={{
+            width: 36, height: 36, borderRadius: 9, background: '#fff',
+            border: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', color: 'var(--text-muted)', boxShadow: '0 1px 2px rgba(40,38,34,0.04)',
+          }}>⚙</div>
+        </div>
+        <div style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, opacity: 0.7,
+          background: 'linear-gradient(90deg, transparent, var(--gold-soft) 20%, var(--gold) 50%, var(--gold-soft) 80%, transparent)',
+        }} />
+      </div>
+
+      {/* THREE COLUMNS */}
+      <div style={{ display: 'grid', gridTemplateColumns: '230px 1fr 300px', overflow: 'hidden' }}>
+
+        {/* SIDEBAR — no logo; brand lives in top bar */}
+        <div style={{ background: 'linear-gradient(180deg,#fbfaf7,#f7f5f1)', borderRight: '1px solid var(--border)', padding: '20px 15px', overflowY: 'auto' }}>
+          <p style={{ fontSize: 9.5, letterSpacing: '.11em', color: 'var(--text-faint)', margin: '4px 0 8px', fontWeight: 600 }}>AREAS</p>
+          {NAV.map(n => {
+            const on = active === n.id;
+            return (
+              <div
+                key={n.id}
+                onClick={() => onNavigate(n.id)}
+                onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(230,0,0,0.045)'; }}
+                onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent'; }}
+                style={{
+                  position: 'relative',
+                  padding: '10px 12px', borderRadius: 9, marginBottom: 3, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 600,
+                  color: on ? 'var(--red)' : 'var(--text-secondary)',
+                  background: on ? 'var(--red-tint)' : 'transparent',
+                  transition: 'background .18s, color .18s',
+                }}
+              >
+                {on && <span style={{ position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, borderRadius: 2, background: 'linear-gradient(180deg,var(--gold-soft),var(--gold))' }} />}
+                <span style={{ fontSize: 14, opacity: 0.9 }}>{n.icon}</span>{n.label}
+              </div>
+            );
+          })}
+
+          <p style={flt}>MARKET</p>
+          <select value={market} onChange={e => setMarket(e.target.value)} style={selStyle}>
+            {markets.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+
+          <p style={flt}>TRANSITION</p>
+          <select value={block} onChange={e => setBlock(e.target.value)} style={selStyle}>
+            {blocks.map(b => <option key={b} value={b}>{b.replace('_vs_Talent', '')}</option>)}
+          </select>
+
+          <p style={flt}>FEATURE SLICE</p>
+          <select value={feature ?? ''} onChange={e => { setFeature(e.target.value || null); setGroup(null); }} style={selStyle}>
+            <option value="">— none —</option>
+            {featureOptions.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
+          {feature && (
+            <select value={group ?? ''} onChange={e => setGroup(e.target.value || null)} style={selStyle}>
+              <option value="">— select —</option>
+              {groupOptions.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+          )}
+        </div>
+
+        {/* CENTER */}
+        <div key={active} className="view-in" style={{ padding: '22px 26px', overflowY: 'auto' }}>
+          {children}
+        </div>
+
+        {/* RIGHT RAIL */}
+        <div style={{ background: 'linear-gradient(180deg,#fbfaf7,#f7f5f1)', borderLeft: '1px solid var(--border)', padding: '20px 18px', overflowY: 'auto' }}>
+          {deepDive}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+#####
+# 3. src/views/OverviewView.jsx
+#    (personal filename may be OverView.jsx — match App.jsx import)
+################################################################
+import { nice } from '../utils/nice';
+
+function strengthWord(pct) {
+  const a = Math.abs(pct);
+  if (a > 300) return pct >= 0 ? 'by far the strongest driver' : 'the strongest blocker';
+  if (a > 100) return pct >= 0 ? 'a very strong driver' : 'a strong blocker';
+  if (a > 30) return pct >= 0 ? 'a moderate driver' : 'a moderate blocker';
+  return pct >= 0 ? 'a mild positive signal' : 'a mild negative signal';
+}
+
+function interpretation(feature, pct, p) {
+  const name = nice(feature);
+  if (p > 0.05) {
+    return `${name} shows a ${pct >= 0 ? 'positive' : 'negative'} association, but it isn't statistically reliable (p > 0.05) — not a basis for action on its own.`;
+  }
+  if (pct >= 0) {
+    return `People with ${name.toLowerCase()} are substantially more likely to be nominated than comparable peers. This is ${strengthWord(pct)} in this market.`;
+  }
+  return `${name} works against the move — people with it are less likely to progress in the near term. It is ${strengthWord(pct)} here.`;
+}
+
+function tag(pct, p) {
+  if (p > 0.05) return { text: 'LOW CONFIDENCE', bg: 'var(--amber-tint)', col: 'var(--amber)' };
+  if (pct >= 300) return { text: 'STRONGEST', bg: 'var(--status-red-tint)', col: 'var(--status-red)' };
+  if (pct >= 0) return { text: 'POSITIVE', bg: 'var(--green-tint)', col: 'var(--green)' };
+  return { text: 'BLOCKER', bg: 'var(--status-red-tint)', col: 'var(--status-red)' };
+}
+
+function directionWord(pct) {
+  const a = Math.abs(pct);
+  if (pct >= 0) return a > 300 ? 'strongest ▲' : a > 100 ? 'much higher ▲' : a > 30 ? 'higher ▲' : 'slightly ▲';
+  return a > 100 ? 'much lower ▼' : a > 30 ? 'lower ▼' : 'slightly ▼';
+}
+
+function Card({ r, maxAbs }) {
+  const t = tag(r.pct, r.p);
+  const faded = r.p > 0.05;
+  const barCol = faded ? '#c7c3ba' : (r.pct >= 0 ? 'var(--green)' : 'var(--status-red)');
+  const strength = Math.min(100, (Math.abs(r.pct) / maxAbs) * 100);
+  const confidence = r.p > 0.05 ? 'Low confidence' : (r.p < 0.01 ? 'High confidence' : 'Moderate confidence');
+
+  return (
+    <div className="card-rich" style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>{nice(r.feature)}</span>
+        <span style={{ fontSize: 9, letterSpacing: '.06em', padding: '3px 8px', borderRadius: 5, fontWeight: 700, background: t.bg, color: t.col }}>{t.text}</span>
+      </div>
+      <p style={{ fontSize: 32, fontWeight: 700, textAlign: 'center', margin: '14px 0 2px', color: faded ? 'var(--text-muted)' : (r.pct >= 0 ? 'var(--green)' : 'var(--status-red)') }}>
+        {directionWord(r.pct)}
+      </p>
+      <p style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 16 }}>relative strength in this market</p>
+
+      <div style={{ height: 6, background: 'var(--surface-sunk)', borderRadius: 3, marginBottom: 16, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${strength}%`, background: barCol, borderRadius: 3 }} />
+      </div>
+
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+        <p style={{ fontSize: 9, letterSpacing: '.06em', color: 'var(--text-faint)', textTransform: 'uppercase', margin: '0 0 6px' }}>✦ Interpretation</p>
+        <p style={{ fontSize: 12, lineHeight: 1.55, color: 'var(--text-secondary)', margin: 0 }}>{interpretation(r.feature, r.pct, r.p)}</p>
+        <p style={{ fontSize: 10, color: 'var(--text-faint)', textAlign: 'right', margin: '8px 0 0' }}>{confidence}</p>
+      </div>
+    </div>
+  );
+}
+
+export default function OverviewView({ driverRows, market, block }) {
+  const sorted = [...driverRows].sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
+  const top4 = sorted.slice(0, 4);
+  const maxAbs = Math.max(...sorted.map(r => Math.abs(r.pct)), 1);
+  const goal = block.replace('_vs_Talent', '');
+
+  const strongest = sorted[0];
+  const blocker = sorted.find(r => r.pct < 0 && r.p <= 0.05);
+  const riskyCount = driverRows.filter(r => r.p > 0.05).length;
+
+  const summary = `In ${market}, ${nice(strongest.feature).toLowerCase()} is ${strengthWord(strongest.pct)} into ${goal} — people with it are far more likely to be nominated.` +
+    (blocker ? ` By contrast, ${nice(blocker.feature).toLowerCase()} works against the near-term move.` : '') +
+    (riskyCount > 0 ? ` ${riskyCount} driver${riskyCount > 1 ? 's are' : ' is'} not statistically reliable and should be read with caution.` : '');
+
+  return (
+    <div>
+      <div className="card-rich" style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px', marginBottom: 18 }}>
+        <p style={{ fontSize: 10, letterSpacing: '.08em', color: 'var(--text-faint)', margin: '0 0 10px' }}>✦ INSIGHTS SUMMARY</p>
+        <p style={{ fontSize: 13.5, lineHeight: 1.65, color: 'var(--text-secondary)', margin: 0 }}>
+          <b style={{ color: 'var(--text-primary)' }}>Overview:</b> {summary}
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        {top4.map(r => <Card key={r.feature} r={r} maxAbs={maxAbs} />)}
+      </div>
+    </div>
+  );
+}
+
+
+###########################################################################################################################
+# 4. src/views/DriverView.jsx
+################################################################
+import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { nice } from '../utils/nice';
+import { describe } from '../utils/describe';
+
+function plainLabel(pct) {
+  const a = Math.abs(pct);
+  if (pct >= 0) {
+    if (a > 300) return 'strongest ▲';
+    if (a > 100) return 'much higher ▲';
+    if (a > 30) return 'higher ▲';
+    return 'slightly ▲';
+  } else {
+    if (a > 100) return 'much lower ▼';
+    if (a > 30) return 'lower ▼';
+    return 'slightly ▼';
+  }
+}
+
+function impactSentence(feature, pct, p) {
+  if (p > 0.05) return `${nice(feature)} shows a ${pct >= 0 ? 'positive' : 'negative'} association, but it's not statistically reliable — treat with caution.`;
+  if (pct >= 0) return `People with ${nice(feature).toLowerCase()} are more likely to progress. ${Math.abs(pct) > 300 ? 'This is the strongest lever here.' : ''}`;
+  return `${nice(feature)} works against the near-term move — people with it are less likely to progress.`;
+}
+
+function kpiFact(label, market, allMarketKpis) {
+  const val = (m, key) => allMarketKpis[m]?.[key] ?? 0;
+  const avg = (key) => Object.values(allMarketKpis).reduce((s, k) => s + k[key], 0) / Object.keys(allMarketKpis).length;
+  if (label === 'Headcount') {
+    const biggest = Object.keys(allMarketKpis).reduce((a, b) => allMarketKpis[a].n > allMarketKpis[b].n ? a : b);
+    return market === biggest ? `${market} is the largest population of the three markets.` : `${market} is smaller than ${biggest}, the largest market.`;
+  }
+  const key = label === 'Talent' ? 'talentRate' : label === 'Accelerated' ? 'acceleratedRate' : 'topRate';
+  const here = val(market, key);
+  const diff = here - avg(key);
+  const dir = diff >= 0 ? 'above' : 'below';
+  const rank = Object.keys(allMarketKpis).sort((a, b) => val(b, key) - val(a, key)).indexOf(market) + 1;
+  return `At ${here.toFixed(1)}%, ${market} is ${Math.abs(diff).toFixed(1)} pts ${dir} the cross-market average — rank ${rank} of ${Object.keys(allMarketKpis).length}.`;
+}
+
+function Kpi({ label, count, pct, accent, fact }) {
+  const [flipped, setFlipped] = useState(false);
+  return (
+    <div onClick={() => setFlipped(f => !f)} style={{ perspective: 800, cursor: 'pointer', height: 88 }}>
+      <div style={{ position: 'relative', width: '100%', height: '100%', transition: 'transform .5s', transformStyle: 'preserve-3d', transform: flipped ? 'rotateY(180deg)' : 'none' }}>
+        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 11, padding: '13px 15px', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: accent }} />
+          <p style={{ fontSize: 10, letterSpacing: '.04em', color: 'var(--text-muted)', textTransform: 'uppercase', margin: 0 }}>{label}</p>
+          <p style={{ fontSize: 22, fontWeight: 700, margin: '5px 0 0' }}>{count}</p>
+          {pct != null && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '1px 0 0' }}>{pct.toFixed(1)}%</p>}
+        </div>
+        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 11, padding: '12px 14px', display: 'flex', alignItems: 'center' }}>
+          <p style={{ fontSize: 11, lineHeight: 1.45, color: 'var(--text-secondary)', margin: 0 }}>{fact}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Bar({ row, min, max, selected, onClick, onHover, onLeave }) {
+  const { feature, pct, p } = row;
+  const span = max - min || 1;
+  const zero = ((0 - min) / span) * 100;
+  const size = (Math.abs(pct) / span) * 100;
+  const left = pct >= 0 ? zero : zero - size;
+  const faded = p > 0.05;
+  const colour = faded ? '#c7c3ba' : (pct >= 0 ? 'var(--green)' : 'var(--status-red)');
+  const textCol = faded ? 'var(--text-muted)' : (pct >= 0 ? 'var(--green)' : 'var(--status-red)');
+
+  return (
+    <div
+      onClick={onClick}
+      onMouseMove={onHover}
+      onMouseLeave={onLeave}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 11, marginBottom: 12, cursor: 'pointer',
+        background: selected ? 'var(--red-tint)' : 'transparent', borderRadius: 8,
+        padding: selected ? '6px 8px' : '0', margin: selected ? '0 -8px 12px' : '0 0 12px',
+        transition: 'background .15s',
+      }}
+    >
+      <div style={{ width: 190, textAlign: 'right', fontSize: 12, color: selected ? 'var(--red)' : 'var(--text-secondary)', fontWeight: selected ? 600 : 400 }}>
+        {nice(feature)}{faded && <span style={{ color: 'var(--text-faint)', fontSize: 10 }}> (low conf.)</span>}
+      </div>
+      <div style={{ flex: 1, position: 'relative', height: 20, background: 'var(--surface-sunk)', borderRadius: 5 }}>
+        <div style={{ position: 'absolute', left: `${zero}%`, top: -3, bottom: -3, width: 1, background: '#d8d4cb' }} />
+        <div style={{ position: 'absolute', left: `${left}%`, width: `${size}%`, height: '100%', background: colour, borderRadius: 5 }} />
+      </div>
+      <div style={{ width: 92, fontSize: 11.5, fontWeight: 600, color: textCol }}>{plainLabel(pct)}</div>
+    </div>
+  );
+}
+
+export default function DriverView({ kpi, driverRows, block, market, allMarketKpis = {} }) {
+  const sorted = useMemo(() => [...driverRows].sort((a, b) => a.pct - b.pct), [driverRows]);
+  const byStrength = useMemo(() => [...driverRows].sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)), [driverRows]);
+  const values = sorted.map(r => r.pct);
+  const min = Math.min(...values, 0);
+  const max = Math.max(...values, 0);
+  const goal = block.replace('_vs_Talent', '');
+
+  const [selected, setSelected] = useState(null);
+  const [tip, setTip] = useState(null);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+
+  const strongest = byStrength[0];
+  const blocker = byStrength.find(r => r.pct < 0 && r.p <= 0.05);
+  const riskyCount = driverRows.filter(r => r.p > 0.05).length;
+  const summary = strongest
+    ? `In ${market}, ${nice(strongest.feature).toLowerCase()} is the strongest driver of ${goal} — people with it are far more likely to progress.` +
+      (blocker ? ` The clearest blocker is ${nice(blocker.feature).toLowerCase()}.` : '') +
+      (riskyCount > 0 ? ` ${riskyCount} factor${riskyCount > 1 ? 's are' : ' is'} not statistically reliable.` : '')
+    : 'No driver data for this selection.';
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div className="card-rich" style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 18px', marginBottom: 16 }}>
+        <p style={{ fontSize: 10, letterSpacing: '.08em', color: 'var(--text-faint)', margin: '0 0 8px' }}>✦ WHAT THIS CHART SHOWS</p>
+        <p style={{ fontSize: 12.5, lineHeight: 1.6, color: 'var(--text-secondary)', margin: 0 }}>{summary}</p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 18 }}>
+        <Kpi label="Headcount" count={kpi.n} accent="var(--kpi-head)" fact={kpiFact('Headcount', market, allMarketKpis)} />
+        <Kpi label="Talent" count={Math.round(kpi.n * kpi.talentRate / 100)} pct={kpi.talentRate} accent="var(--kpi-talent)" fact={kpiFact('Talent', market, allMarketKpis)} />
+        <Kpi label="Accelerated" count={Math.round(kpi.n * kpi.acceleratedRate / 100)} pct={kpi.acceleratedRate} accent="var(--kpi-accel)" fact={kpiFact('Accelerated', market, allMarketKpis)} />
+        <Kpi label="Top talent" count={Math.round(kpi.n * kpi.topRate / 100)} pct={kpi.topRate} accent="var(--kpi-top)" fact={kpiFact('Top talent', market, allMarketKpis)} />
+      </div>
+
+      <div className="card-rich" style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px' }}>
+        <p style={{ fontSize: 13.5, fontWeight: 600, margin: '0 0 4px' }}>What drives {goal} — {market}</p>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '0 0 18px' }}>Hover a bar for its impact · click a factor name for a full description.</p>
+        {sorted.map(r => (
+          <Bar
+            key={r.feature}
+            row={r}
+            min={min}
+            max={max}
+            selected={selected?.feature === r.feature}
+            onClick={() => setSelected(r)}
+            onHover={(e) => { setTip(r); setPos({ x: e.clientX, y: e.clientY }); }}
+            onLeave={() => setTip(null)}
+          />
+        ))}
+      </div>
+
+      {tip && createPortal(
+        <div style={{
+          position: 'fixed', left: pos.x + 16, top: pos.y + 16,
+          background: '#fff', color: 'var(--text-primary)', border: '1px solid var(--border)',
+          padding: '10px 13px', borderRadius: 8, fontSize: 12, maxWidth: 240,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 9999, pointerEvents: 'none',
+        }}>
+          <p style={{ margin: '0 0 4px', fontWeight: 600 }}>{nice(tip.feature)}</p>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{impactSentence(tip.feature, tip.pct, tip.p)}</p>
+        </div>,
+        document.body
+      )}
+
+      {selected && createPortal(
+        <div onClick={() => setSelected(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(30,28,24,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
+          <div onClick={e => e.stopPropagation()} className="msg-rise" style={{ background: '#fff', borderRadius: 14, padding: '24px 26px', maxWidth: 440, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', borderTop: '3px solid var(--red)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+              <p style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>{nice(selected.feature)}</p>
+              <span onClick={() => setSelected(null)} style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: 20, lineHeight: 1 }}>×</span>
+            </div>
+            <p style={{ fontSize: 10, letterSpacing: '.06em', color: 'var(--text-faint)', textTransform: 'uppercase', margin: '0 0 6px' }}>What it is</p>
+            <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-secondary)', margin: '0 0 16px' }}>{describe(selected.feature)}</p>
+            <p style={{ fontSize: 10, letterSpacing: '.06em', color: 'var(--text-faint)', textTransform: 'uppercase', margin: '0 0 6px' }}>What it means here</p>
+            <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-secondary)', margin: 0 }}>{impactSentence(selected.feature, selected.pct, selected.p)}</p>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
+
+################################################################
+################################################################
+# 5. src/views/HeatmapView.jsx
+#    (personal filename may be HeatMapView.jsx — match App.jsx import)
+################################################################
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { nice } from '../utils/nice';
+import { buildHeatmapMatrix } from '../utils/heatmap';
+import labels from '../data/labels.json';
+
+function cellColour(cell) {
+  if (!cell) return 'var(--surface-sunk)';
+  const { pct, p } = cell;
+  if (p > 0.05) return '#eae7e0';
+  const strong = Math.abs(pct) > 100;
+  return pct >= 0 ? (strong ? '#2e9e60' : '#8fd0a8') : (strong ? '#d23a3a' : '#f0a58c');
+}
+
+const CATEGORY_ORDER = ['Performance', 'Reward & recognition', 'Tenure & team', 'Demographics'];
+
+function kpiFact(label, market, allMarketKpis) {
+  const val = (m, key) => allMarketKpis[m]?.[key] ?? 0;
+  const avg = (key) => Object.values(allMarketKpis).reduce((s, k) => s + k[key], 0) / Object.keys(allMarketKpis).length;
+  if (label === 'Headcount') {
+    const biggest = Object.keys(allMarketKpis).reduce((a, b) => allMarketKpis[a].n > allMarketKpis[b].n ? a : b);
+    return market === biggest ? `${market} is the largest population of the three markets.` : `${market} is smaller than ${biggest}, the largest market.`;
+  }
+  const key = label === 'Talent' ? 'talentRate' : label === 'Accelerated' ? 'acceleratedRate' : 'topRate';
+  const here = val(market, key);
+  const diff = here - avg(key);
+  const dir = diff >= 0 ? 'above' : 'below';
+  const rank = Object.keys(allMarketKpis).sort((a, b) => val(b, key) - val(a, key)).indexOf(market) + 1;
+  return `At ${here.toFixed(1)}%, ${market} is ${Math.abs(diff).toFixed(1)} pts ${dir} the cross-market average — rank ${rank} of ${Object.keys(allMarketKpis).length}.`;
+}
+
+function Kpi({ label, count, pct, accent, fact }) {
+  const [flipped, setFlipped] = useState(false);
+  return (
+    <div onClick={() => setFlipped(f => !f)} style={{ perspective: 800, cursor: 'pointer', height: 88 }}>
+      <div style={{ position: 'relative', width: '100%', height: '100%', transition: 'transform .5s', transformStyle: 'preserve-3d', transform: flipped ? 'rotateY(180deg)' : 'none' }}>
+        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 11, padding: '13px 15px', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: accent }} />
+          <p style={{ fontSize: 10, letterSpacing: '.04em', color: 'var(--text-muted)', textTransform: 'uppercase', margin: 0 }}>{label}</p>
+          <p style={{ fontSize: 22, fontWeight: 700, margin: '5px 0 0' }}>{count}</p>
+          {pct != null && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '1px 0 0' }}>{pct.toFixed(1)}%</p>}
+        </div>
+        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 11, padding: '12px 14px', display: 'flex', alignItems: 'center' }}>
+          <p style={{ fontSize: 11, lineHeight: 1.45, color: 'var(--text-secondary)', margin: 0 }}>{fact}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function buildSummary(markets, rows, block) {
+  const goal = block.replace('_vs_Talent', '');
+  if (rows.length === 0) return 'No data for this transition.';
+  const inAll = [];
+  const inOne = [];
+  rows.forEach(r => {
+    const present = markets.filter(m => r.cells[m] && r.cells[m].p <= 0.05);
+    if (present.length === markets.length) inAll.push(r);
+    else if (present.length === 1) inOne.push({ r, market: present[0] });
+  });
+  const strongest = rows[0];
+  const strongestMkt = markets.reduce((best, m) => {
+    const v = Math.abs(strongest.cells[m]?.pct ?? 0);
+    return v > (best.v ?? 0) ? { m, v } : best;
+  }, {}).m;
+  let s = `Across markets, ${nice(strongest.feature).toLowerCase()} is the standout driver of ${goal}, strongest in ${strongestMkt}.`;
+  if (inAll.length > 0 && inAll[0].feature !== strongest.feature) s += ` ${nice(inAll[0].feature)} matters consistently in all three markets.`;
+  else if (inAll.length > 0) s += ` It's a reliable signal in all three markets.`;
+  if (inOne.length > 0) s += ` ${nice(inOne[0].r.feature)} only shows up in ${inOne[0].market} — a market-specific pattern.`;
+  return s;
+}
+
+export default function HeatmapView({ kpi, models, block, market, allMarketKpis = {} }) {
+  const { markets, rows } = buildHeatmapMatrix(models, block);
+  const [tip, setTip] = useState(null);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+
+  const summary = buildSummary(markets, rows, block);
+
+  const grouped = {};
+  rows.forEach(r => {
+    const cat = labels[r.feature]?.cat ?? 'Other';
+    (grouped[cat] = grouped[cat] || []).push(r);
+  });
+  const cats = [...CATEGORY_ORDER.filter(c => grouped[c]), ...Object.keys(grouped).filter(c => !CATEGORY_ORDER.includes(c))];
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div className="card-rich" style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 18px', marginBottom: 16 }}>
+        <p style={{ fontSize: 10, letterSpacing: '.08em', color: 'var(--text-faint)', margin: '0 0 8px' }}>✦ WHAT THIS CHART SHOWS</p>
+        <p style={{ fontSize: 12.5, lineHeight: 1.6, color: 'var(--text-secondary)', margin: 0 }}>{summary}</p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 18 }}>
+        <Kpi label="Headcount" count={kpi.n} accent="var(--kpi-head)" fact={kpiFact('Headcount', market, allMarketKpis)} />
+        <Kpi label="Talent" count={Math.round(kpi.n * kpi.talentRate / 100)} pct={kpi.talentRate} accent="var(--kpi-talent)" fact={kpiFact('Talent', market, allMarketKpis)} />
+        <Kpi label="Accelerated" count={Math.round(kpi.n * kpi.acceleratedRate / 100)} pct={kpi.acceleratedRate} accent="var(--kpi-accel)" fact={kpiFact('Accelerated', market, allMarketKpis)} />
+        <Kpi label="Top talent" count={Math.round(kpi.n * kpi.topRate / 100)} pct={kpi.topRate} accent="var(--kpi-top)" fact={kpiFact('Top talent', market, allMarketKpis)} />
+      </div>
+
+      <div className="card-rich" style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px' }}>
+        <p style={{ fontSize: 13.5, fontWeight: 600, margin: '0 0 4px' }}>Predictor heatmap — {block.replace('_vs_Talent', '')} across markets</p>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '0 0 18px' }}>Green = increases odds · Red = decreases · Grey = not in that market's model · Faded = not reliable</p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: `220px repeat(${markets.length}, 1fr)`, gap: 6, marginBottom: 8 }}>
+          <div />
+          {markets.map(m => <div key={m} style={{ fontSize: 11.5, textAlign: 'center', color: 'var(--text-secondary)', fontWeight: 600 }}>{m}</div>)}
+        </div>
+
+        {cats.map(cat => (
+          <div key={cat} style={{ marginBottom: 14 }}>
+            <p style={{ fontSize: 10, letterSpacing: '.06em', color: 'var(--text-faint)', textTransform: 'uppercase', margin: '0 0 6px' }}>{cat}</p>
+            {grouped[cat].map(r => (
+              <div key={r.feature} style={{ display: 'grid', gridTemplateColumns: `220px repeat(${markets.length}, 1fr)`, gap: 6, marginBottom: 5 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>{nice(r.feature)}</div>
+                {markets.map(m => (
+                  <div
+                    key={m}
+                    onMouseMove={(e) => { setTip({ feature: r.feature, market: m, cell: r.cells[m] }); setPos({ x: e.clientX, y: e.clientY }); }}
+                    onMouseLeave={() => setTip(null)}
+                    style={{
+                      height: 30, borderRadius: 5, background: cellColour(r.cells[m]), cursor: r.cells[m] ? 'pointer' : 'default',
+                      transition: 'transform .15s, box-shadow .15s',
+                      transform: tip?.feature === r.feature && tip?.market === m ? 'scale(1.06)' : 'none',
+                      boxShadow: tip?.feature === r.feature && tip?.market === m ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+                    }}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {tip && createPortal(
+        <div style={{
+          position: 'fixed', left: pos.x + 16, top: pos.y + 16, background: '#fff', color: 'var(--text-primary)',
+          border: '1px solid var(--border)', padding: '10px 14px', borderRadius: 8, fontSize: 12, maxWidth: 230,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 9999, pointerEvents: 'none',
+        }}>
+          <p style={{ margin: '0 0 4px', fontWeight: 600 }}>{nice(tip.feature)}</p>
+          <p style={{ margin: '0 0 4px', color: 'var(--text-muted)' }}>{tip.market}</p>
+          {tip.cell ? (
+            <>
+              <p style={{ margin: '2px 0', color: 'var(--text-secondary)' }}>{tip.cell.pct >= 0 ? 'Increases' : 'Decreases'} the odds {Math.abs(tip.cell.pct) > 100 ? 'strongly' : 'moderately'}</p>
+              <p style={{ margin: 0, color: tip.cell.p > 0.05 ? 'var(--amber)' : 'var(--green)' }}>{tip.cell.p > 0.05 ? 'Not statistically reliable' : 'Statistically reliable'}</p>
+            </>
+          ) : (
+            <p style={{ margin: 0, color: 'var(--text-muted)' }}>Not used in this market's model</p>
+          )}
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
+
+################################################################
+#####
+# 6. src/views/SimulationView.jsx
+################################################################
+import { useState, useMemo } from 'react';
+import { buildLevers, simulate } from '../utils/simulate';
+
+function Toggle({ on, onClick }) {
+  return (
+    <div onClick={onClick} style={{
+      width: 42, height: 24, borderRadius: 12, position: 'relative', cursor: 'pointer',
+      background: on ? 'linear-gradient(120deg,#E60000,#b40000)' : '#d8d4cb',
+      transition: 'background .2s', flexShrink: 0,
+    }}>
+      <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: on ? 21 : 3, transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+    </div>
+  );
+}
+
+export default function SimulationView({ models, market, block }) {
+  const [values, setValues] = useState({});
+
+  const modelRows = models[market].models[block];
+  const activeLevers = useMemo(() => buildLevers(modelRows), [modelRows]);
+  const { multiplier, contributions } = useMemo(
+    () => simulate(modelRows, activeLevers, values),
+    [modelRows, activeLevers, values]
+  );
+
+  useMemo(() => setValues({}), [market, block]);
+
+  const toggle = (id) => setValues(v => ({ ...v, [id]: !v[id] }));
+  const goal = block.replace('_vs_Talent', '');
+  const heroColour = multiplier >= 1 ? 'var(--green)' : 'var(--status-red)';
+  const gaugePct = Math.min(100, Math.max(4, (Math.log(multiplier) / Math.log(12)) * 100));
+
+  return (
+    <div>
+      <div style={{ marginBottom: 18 }}>
+        <p style={{ fontSize: 18, fontWeight: 600, margin: '0 0 4px' }}>Simulate your situation</p>
+        <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: 0 }}>
+          Adjust the factors you can influence and watch your odds of moving up shift in real time.
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+        <div className="card-rich" style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
+          <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-faint)', margin: '0 0 14px' }}>Your profile</p>
+          {activeLevers.map((lever, i) => (
+            <div key={lever.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', borderBottom: i === activeLevers.length - 1 ? 'none' : '1px solid var(--border)' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{lever.label}</span>
+              <Toggle on={!!values[lever.id]} onClick={() => toggle(lever.id)} />
+            </div>
+          ))}
+          {activeLevers.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No factors in this market's model.</p>}
+        </div>
+
+        <div className="card-rich" style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 12, padding: 22, display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: 380 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6, textAlign: 'center' }}>Your odds of becoming {goal}</p>
+          <p style={{ fontSize: 64, fontWeight: 700, lineHeight: 1, color: heroColour, margin: '4px 0', transition: 'color .3s' }}>{multiplier.toFixed(1)}×</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 22 }}>vs a comparable baseline person</p>
+
+          <div style={{ width: 220, height: 9, background: 'var(--surface-sunk)', borderRadius: 5, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${gaugePct}%`, background: heroColour, borderRadius: 5, transition: 'width .3s' }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: 220, fontSize: 10, color: 'var(--text-faint)', marginTop: 5 }}>
+            <span>baseline</span><span>strong</span>
+          </div>
+
+          <div style={{ marginTop: 24, width: '100%' }}>
+            {contributions.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>Flip a factor on to see its effect.</p>}
+            {contributions.map(c => {
+              const col = c.pct >= 0 ? 'var(--green)' : 'var(--status-red)';
+              const w = Math.min(100, Math.abs(c.pct) / 6);
+              return (
+                <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-secondary)', width: 130, textAlign: 'right' }}>{c.label}</span>
+                  <div style={{ flex: 1, height: 8, background: 'var(--surface-sunk)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${w}%`, background: col, borderRadius: 4 }} />
+                  </div>
+                  <span style={{ fontSize: 11, color: col, width: 44 }}>{c.pct >= 0 ? 'adds' : 'cuts'}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <p style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 18, textAlign: 'center' }}>
+        Shows relative odds vs a baseline, from the model's coefficients. Not an individual prediction or guarantee.
+      </p>
+    </div>
+  );
+}
+
+
+################################################################
+# 7. src/views/DeepDive.jsx
+################################################################
+import { useState } from 'react';
+import { nice } from '../utils/nice';
+
+export default function DeepDive({ driverRows, market, block }) {
+  const [messages, setMessages] = useState([]);
+  const [draft, setDraft] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const sorted = [...driverRows].sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
+  const strongest = sorted[0];
+  const goal = block.replace('_vs_Talent', '');
+
+  const whyText = strongest
+    ? `${nice(strongest.feature)} dominates because nomination leans heavily on the annual performance signal. The same people tend to be recognised year on year, which compounds the effect.`
+    : 'Select a market to see what drives progression.';
+
+  const recText = `Focus development conversations on the strongest levers, and check whether people who look strong on paper are being overlooked for the next step too early.`;
+
+  const followUps = [
+    `How does this differ across markets?`,
+    `What blocks people from ${goal}?`,
+    `Which drivers aren't reliable here?`,
+  ];
+
+  const chips = ['Strongest driver?', "What's a blocker?", 'Compare markets'];
+
+  const ask = (q) => {
+    if (!q.trim() || loading) return;
+    setMessages(m => [...m, { role: 'user', text: q }]);
+    setDraft('');
+    setLoading(true);
+    setTimeout(() => {
+      setMessages(m => [...m, {
+        role: 'assistant',
+        text: "I'm being connected to Vodafone's approved AI service. The interface is ready — live, data-grounded answers arrive once that's in place.",
+      }]);
+      setLoading(false);
+    }, 900);
+  };
+
+  const eyebrow = { fontSize: 9.5, letterSpacing: '.1em', color: 'var(--text-faint)', fontWeight: 600, margin: '0 0 12px' };
+  const rh = { fontSize: 9.5, letterSpacing: '.09em', color: 'var(--text-muted)', fontWeight: 600, margin: '0 0 9px' };
+  const secText = { fontSize: 12, lineHeight: 1.65, color: 'var(--text-secondary)', margin: 0 };
+  const started = messages.length > 0;
+
+  return (
+    <div>
+      <p style={eyebrow}>✦ INSIGHTS DEEP DIVE</p>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12 }}>
+        <div style={{
+          position: 'relative', width: 32, height: 32, borderRadius: 9,
+          background: 'linear-gradient(135deg,#E60000,#b40000)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14,
+          boxShadow: '0 2px 6px rgba(230,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.2)',
+        }}>
+          ✦
+          <span style={{ position: 'absolute', right: -2, bottom: -2, width: 9, height: 9, borderRadius: '50%', background: 'var(--green)', border: '2px solid #f7f5f1' }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Talent Assistant</div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Grounded in your model data</div>
+        </div>
+      </div>
+
+      {started && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+          {messages.map((m, i) => (
+            <div key={i} className="msg-rise" style={{ display: 'flex', gap: 8, flexDirection: m.role === 'user' ? 'row-reverse' : 'row' }}>
+              <div style={{
+                width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: 'flex',
+                alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff',
+                background: m.role === 'user' ? '#c7c3ba' : 'linear-gradient(135deg,#E60000,#b40000)',
+              }}>
+                {m.role === 'user' ? 'You' : '✦'}
+              </div>
+              <div style={{
+                fontSize: 12, lineHeight: 1.55, padding: '9px 12px', borderRadius: 11, maxWidth: '78%',
+                background: m.role === 'user' ? 'var(--red-tint)' : '#fff',
+                color: m.role === 'user' ? 'var(--red-dark)' : 'var(--text-secondary)',
+                border: m.role === 'user' ? 'none' : '1px solid var(--border)',
+                borderTopLeftRadius: m.role === 'user' ? 11 : 3,
+                borderTopRightRadius: m.role === 'user' ? 3 : 11,
+                boxShadow: m.role === 'user' ? 'none' : '0 1px 3px rgba(40,38,34,0.04)',
+              }}>
+                {m.text}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', background: 'linear-gradient(135deg,#E60000,#b40000)' }}>✦</div>
+              <div className="typing-dots" style={{ display: 'flex', gap: 4, padding: '11px 13px', background: '#fff', border: '1px solid var(--border)', borderRadius: 11, borderTopLeftRadius: 3, width: 'fit-content' }}>
+                <span /><span /><span />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="chat-input" style={{
+        display: 'flex', alignItems: 'center', gap: 8, background: '#fff',
+        border: '1px solid var(--border-strong)', borderRadius: 12, padding: '8px 8px 8px 15px', marginBottom: 12,
+        boxShadow: '0 2px 10px rgba(40,38,34,0.05)', transition: 'box-shadow .2s, border-color .2s',
+      }}>
+        <input
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && ask(draft)}
+          placeholder="Ask about these drivers…"
+          style={{ flex: 1, border: 'none', outline: 'none', fontSize: 12.5, background: 'transparent', color: 'var(--text-primary)' }}
+        />
+        <div onClick={() => ask(draft)} style={{ width: 32, height: 32, borderRadius: 9, background: 'linear-gradient(135deg,#E60000,#b40000)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, cursor: 'pointer', boxShadow: '0 2px 6px rgba(230,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2)' }}>➤</div>
+      </div>
+
+      {!started && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 24 }}>
+          {chips.map(c => (
+            <div
+              key={c}
+              onClick={() => ask(c)}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold-soft)'; e.currentTarget.style.color = 'var(--red)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+              style={{ fontSize: 11, color: 'var(--text-secondary)', background: '#fff', border: '1px solid var(--border-strong)', borderRadius: 15, padding: '6px 11px', cursor: 'pointer', transition: 'all .15s' }}
+            >
+              {c}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ marginBottom: 20 }}>
+        <p style={rh}>◔ WHY DOES THIS HAPPEN?</p>
+        <p style={secText}>{whyText}</p>
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <p style={rh}>▤ RECOMMENDATIONS</p>
+        <p style={secText}>{recText}</p>
+      </div>
+
+      <div>
+        <p style={rh}>↗ POTENTIAL FOLLOW-UPS</p>
+        {followUps.map((f, i) => (
+          <div
+            key={i}
+            onClick={() => ask(f)}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--red)'; e.currentTarget.style.paddingLeft = '5px'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.paddingLeft = '0'; }}
+            style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '10px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'color .15s, padding-left .15s' }}
+          >
+            {f}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+################################################################
+# 8. src/App.jsx
+#    IMPORTANT: import paths must match your actual filenames.
+#    This uses OverviewView / HeatmapView / DeepDive in ./views/.
+#    On personal they were OverView / HeatMapView — adjust to match.
+################################################################
+import { useState, useMemo } from 'react';
+import models from './data/models.json';
+import Layout from './components/Layout';
+import DeepDive from './views/DeepDive';
+import OverviewView from './views/OverviewView';
+import DriverView from './views/DriverView';
+import HeatmapView from './views/HeatmapView';
+import SimulationView from './views/SimulationView';
+
+const MARKETS = Object.keys(models);
+const BLOCKS = Object.keys(models[MARKETS[0]].models);
+
+function combinedRateRows(marketData) {
+  const cat = marketData.rates['Categorical Base Rates'] ?? [];
+  const bin = marketData.rates['Binary Base Rates'] ?? [];
+  return [...cat, ...bin];
+}
+
+function marketKpi(marketData) {
+  const cat = marketData.rates['Categorical Base Rates'] ?? [];
+  const bin = marketData.rates['Binary Base Rates'] ?? [];
+  const rows = [...cat, ...bin];
+  const genderRows = rows.filter(r => r.feature === 'Gender');
+  const n = genderRows.reduce((s, r) => s + r.n, 0);
+  const talent = genderRows.reduce((s, r) => s + r.talent, 0);
+  const accelerated = genderRows.reduce((s, r) => s + r.accelerated, 0);
+  const top = genderRows.reduce((s, r) => s + r.top, 0);
+  return {
+    n,
+    talentRate: n ? (talent / n) * 100 : 0,
+    acceleratedRate: n ? (accelerated / n) * 100 : 0,
+    topRate: n ? (top / n) * 100 : 0,
+  };
+}
+
+export default function App() {
+  const [active, setActive] = useState('overview');
+  const [market, setMarket] = useState(MARKETS[0]);
+  const [block, setBlock] = useState(BLOCKS[0]);
+  const [feature, setFeature] = useState(null);
+  const [group, setGroup] = useState(null);
+
+  const marketData = models[market];
+  const rateRows = useMemo(() => combinedRateRows(marketData), [marketData]);
+
+  const featureOptions = useMemo(
+    () => [...new Set(rateRows.map(r => r.feature))],
+    [rateRows]
+  );
+  const groupOptions = useMemo(
+    () => feature ? [...new Set(rateRows.filter(r => r.feature === feature).map(r => r.group))] : [],
+    [rateRows, feature]
+  );
+
+  const driverRows = marketData.models[block];
+
+  const kpi = useMemo(() => {
+    if (feature && group) {
+      const row = rateRows.find(r => r.feature === feature && r.group === group);
+      if (row) return { n: row.n, talentRate: row.talentRate, acceleratedRate: row.acceleratedRate, topRate: row.topRate };
+    }
+    const genderRows = rateRows.filter(r => r.feature === 'Gender');
+    const n = genderRows.reduce((s, r) => s + r.n, 0);
+    const talent = genderRows.reduce((s, r) => s + r.talent, 0);
+    const accelerated = genderRows.reduce((s, r) => s + r.accelerated, 0);
+    const top = genderRows.reduce((s, r) => s + r.top, 0);
+    return {
+      n,
+      talentRate: n ? (talent / n) * 100 : 0,
+      acceleratedRate: n ? (accelerated / n) * 100 : 0,
+      topRate: n ? (top / n) * 100 : 0,
+    };
+  }, [rateRows, feature, group]);
+
+  // cross-market KPI stats for comparison facts
+  const allMarketKpis = useMemo(() => {
+    const out = {};
+    MARKETS.forEach(m => { out[m] = marketKpi(models[m]); });
+    return out;
+  }, []);
+
+  const views = {
+    overview: <OverviewView driverRows={driverRows} market={market} block={block} />,
+    driver: <DriverView kpi={kpi} driverRows={driverRows} block={block} market={market} allMarketKpis={allMarketKpis} />,
+    heatmap: <HeatmapView kpi={kpi} models={models} block={block} market={market} allMarketKpis={allMarketKpis} />,
+    simulation: <SimulationView models={models} market={market} block={block} />,
+  };
+
+  const deepDive = <DeepDive driverRows={driverRows} market={market} block={block} />;
+
+  return (
+    <Layout
+      active={active}
+      onNavigate={setActive}
+      markets={MARKETS}
+      market={market}
+      setMarket={setMarket}
+      blocks={BLOCKS}
+      block={block}
+      setBlock={setBlock}
+      featureOptions={featureOptions}
+      feature={feature}
+      setFeature={setFeature}
+      groupOptions={groupOptions}
+      group={group}
+      setGroup={setGroup}
+      deepDive={deepDive}
+    >
+      {views[active]}
+    </Layout>
+  );
+}
+
+================================================================
+END OF BUNDLE
+================================================================

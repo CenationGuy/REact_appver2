@@ -1,0 +1,197 @@
+================================================================
+LIGHT COCKPIT CONVERSION — OFFICE LAPTOP MIGRATION GUIDE
+================================================================
+This converts the dark app to the light "Talent Cockpit" theme
+that addresses all of Claudia's comments.
+
+READ THIS FIRST — 3 critical rules:
+--------------------------------------------------------------
+1. DO NOT touch the office src/data/models.json — it holds the
+   REAL data. Everything below works with it unchanged. Never
+   overwrite it with the fake personal-laptop one.
+
+2. labels.json — you likely already have this on office. If NOT,
+   copy the one provided separately. It needs a "cat" field on
+   each entry (Performance / Reward & recognition / Tenure & team
+   / Demographics) for the grouped heatmap. Check yours has "cat";
+   if it only has "label", update it.
+
+3. FILENAME CASING MUST MATCH EXACTLY. On personal the view files
+   ended up named OverView.jsx and HeatMapView.jsx. On office,
+   name them however you like — BUT the import paths in App.jsx
+   must match your filenames exactly (Linux/Cloud Shell is
+   case-sensitive). This guide uses clean names:
+   OverviewView.jsx, DriverView.jsx, HeatmapView.jsx,
+   SimulationView.jsx, DeepDive.jsx  — all in src/views/.
+   If you name them differently, fix App.jsx imports to match.
+
+
+================================================================
+FINAL FILE STRUCTURE (what src/ should look like when done)
+================================================================
+src/
+├── App.jsx                    ← REPLACE
+├── index.css                  ← REPLACE (light theme)
+├── main.jsx                   ← unchanged
+├── data/
+│   ├── models.json            ← UNCHANGED (real data — do not touch)
+│   └── labels.json            ← check has "cat" field (update if needed)
+├── utils/
+│   ├── nice.js                ← unchanged
+│   ├── heatmap.js             ← unchanged
+│   ├── simulate.js            ← unchanged
+│   └── describe.js            ← NEW
+├── components/
+│   └── Layout.jsx             ← NEW (the shell)
+└── views/                     ← NEW FOLDER
+    ├── OverviewView.jsx       ← NEW
+    ├── DriverView.jsx         ← NEW
+    ├── HeatmapView.jsx        ← NEW
+    ├── SimulationView.jsx     ← NEW
+    └── DeepDive.jsx           ← NEW
+
+OLD FILES NO LONGER USED (leave them or delete — not imported):
+  components/Sidebar.jsx, KpiRow.jsx, DriverChart.jsx, Heatmap.jsx,
+  InsightsPanel.jsx, Starfield.jsx, NimbusMascot.jsx, DiscussionPanel.jsx
+  pages/Dashboard.jsx, Landing.jsx, Nimbus.jsx, Simulator.jsx
+
+NOTE: react-router-dom is NO LONGER USED. The new app uses a single
+shell with a state-driven view switch, not routes. You can leave the
+package installed; it just won't be imported.
+
+
+================================================================
+ORDER TO DO IT IN (dependency-safe — no missing-import errors)
+================================================================
+1. index.css
+2. utils/describe.js
+3. components/Layout.jsx
+4. Create the views/ folder
+5. views/OverviewView.jsx
+6. views/DriverView.jsx
+7. views/HeatmapView.jsx
+8. views/SimulationView.jsx
+9. views/DeepDive.jsx
+10. App.jsx   (LAST — it imports everything above)
+
+After each save, the app may show errors until App.jsx is updated
+last. That's expected. Do App.jsx last, then it all resolves.
+
+
+================================================================
+CODE — copy each block into the matching file
+================================================================
+
+Each file's full code is in the SEPARATE code files provided
+alongside this guide (the assistant will give them). This text
+file is your MAP and CHECKLIST.
+
+Checklist against Claudia's comments (all addressed):
+[x] 1. Light theme, not black          → index.css + all views
+[x] 2. KPIs as count AND %             → DriverView / HeatmapView KPIs
+[x] 3. Plain language, not "+X% odds"  → "strongest ▲" etc everywhere
+[x] 4. Mouseover explaining impact     → hover tooltips (Driver + Heatmap)
+[x] 5. Click feature → description      → DriverView inline panel + describe.js
+[x] 6. Summary explanation             → unique summary on Overview/Driver/Heatmap
+[x] 7. Club per theme                  → HeatmapView grouped by cat
+
+
+================================================================
+VISUAL POLISH PASS (classy/rich layer — applied after base works)
+================================================================
+Goal: premium/executive feel — depth, soft shadows, quiet motion,
+subtle GOLD accents. NOT bright/vibrant (Claudia rejected flashy).
+
+Gold is used in only 3 tiny places (never as a block):
+  - top bar bottom hairline (fades out at both ends)
+  - active sidebar nav left-accent
+  - chat input focus glow
+
+Files touched by the polish pass:
+  - index.css   → add --gold / --gold-soft to :root; APPEND polish
+                  layer (keyframes, .card-rich, .view-in, scrollbars,
+                  select focus). Keep all existing :root vars.
+  - Layout.jsx  → top bar gold hairline + soft shadow; richer sidebar
+                  (gradient bg, logo glow, gold active-nav accent,
+                  hover states); scope selector gold dot.
+  - DeepDive.jsx→ "Talent Assistant" header w/ status dot; richer
+                  message bubbles + avatars; animated typing dots;
+                  suggestion chips; gold focus glow on input.
+
+Assistant is named "Talent Assistant" (subtitle: Grounded in your
+model data). Chat is still placeholder until Vertex backend approved.
+
+Polish status:
+[x] index.css: --gold vars + polish layer + chat animations
+    (chat needs extra CSS: .msg-rise, .chat-input:focus-within,
+     .typing-dots span — append these; they reuse rise/blink keyframes)
+[x] Layout.jsx: gold chrome (top bar + sidebar) + view-in fade on swap
+[x] DeepDive.jsx: enhanced Talent Assistant chat (header+status dot,
+    bubbles+avatars, typing dots, suggestion chips, gold focus)
+[x] Views: card-rich added to summary + chart/panel cards in all
+    four views (Overview, Driver, Heatmap, Simulation). KPI cards
+    and heatmap cells left un-lifted on purpose (they have their own
+    hover or would look busy). If a card had an inline boxShadow,
+    remove it so card-rich's shadow doesn't stack.
+
+>>> VISUAL POLISH PASS COMPLETE <<<
+
+NOTE ON DeepDive LOCATION: on personal it lives in src/views/DeepDive.jsx
+and App.jsx imports it as './views/DeepDive'. Keep consistent on office.
+
+
+================================================================
+INTERACTIVITY ENHANCEMENTS (Driver + Heatmap)
+================================================================
+Added after the polish pass:
+
+1. TOOLTIP FIX — the hover tooltip is rendered via React PORTAL
+   into document.body (createPortal), so it escapes the "view-in"
+   container's transform. Any transformed ancestor breaks
+   position:fixed, which made the tooltip stick to the bottom.
+   Portal + zIndex:9999 fixes it. Applies to BOTH DriverView and
+   HeatmapView. The Driver feature popup modal is also portaled.
+   (Requires: import { createPortal } from 'react-dom';)
+
+2. CLICKABLE KPI CARDS — KPIs now flip on click. Front = number + %.
+   Back = a CROSS-MARKET fact, e.g. "At 12.6%, Vodafone UK is 2.1 pts
+   above the cross-market average — rank 1 of 3." Computed, not invented.
+
+3. FEATURE CLICK POPUP (Driver) — clicking a factor name opens a
+   centered modal (dim backdrop) with "What it is" + "What it means
+   here". Click backdrop or × to close. Hover still shows quick tooltip.
+
+APP.JSX CHANGES REQUIRED:
+  - add marketKpi() helper
+  - add allMarketKpis useMemo
+  - pass allMarketKpis + market to DriverView AND HeatmapView
+  Full App.jsx is section 8 of full_code_bundle.txt.
+
+All final code for these is in full_code_bundle.txt (sections 4, 5, 8).
+
+
+================================================================
+BRANDING (top bar)
+================================================================
+Product name is "Talent Analytics". The top bar now shows a brand
+lockup: red icon + "Talent Analytics" + tagline "What drives
+progression across Vodafone". The old "Overview — {market} 👋"
+greeting is REMOVED. The sidebar logo lockup is also REMOVED so the
+brand appears once (top bar only); the sidebar now starts with AREAS.
+All in Layout.jsx (section 2 of full_code_bundle.txt).
+
+
+================================================================
+TESTING AFTER MIGRATION (office, with REAL data)
+================================================================
+1. npm run dev
+2. Click all 4 nav items: Overview, Driver chart, Heatmap, Simulation
+3. Driver view: hover bars (tooltip), click a feature name (description panel)
+4. Heatmap: hover cells (tooltip), confirm grouped by theme
+5. Confirm each view's summary reads sensibly with REAL numbers
+6. Change Market / Transition — everything updates
+7. Right rail (deep dive) shows on every view
+
+If a view errors: the error names the file. 99% of the time on
+office it's a filename-casing mismatch between App.jsx imports and
+the actual file. Fix the import path to match the file exactly.
